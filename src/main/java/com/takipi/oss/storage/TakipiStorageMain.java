@@ -1,5 +1,7 @@
 package com.takipi.oss.storage;
 
+import java.io.FileInputStream;
+import java.io.IOException;
 import java.util.EnumSet;
 
 import javax.servlet.DispatcherType;
@@ -13,9 +15,14 @@ import com.amazonaws.auth.AWSCredentials;
 import com.amazonaws.auth.BasicAWSCredentials;
 import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.AmazonS3Client;
+import com.google.auth.oauth2.GoogleCredentials;
+import com.google.cloud.storage.Storage;
+import com.google.cloud.storage.StorageOptions;
+import com.google.common.collect.Lists;
 import com.takipi.oss.storage.fs.BaseRecord;
 import com.takipi.oss.storage.fs.api.Filesystem;
 import com.takipi.oss.storage.fs.folder.simple.SimpleFilesystem;
+import com.takipi.oss.storage.fs.gcs.GCSFilesystem;
 import com.takipi.oss.storage.fs.s3.S3Filesystem;
 import com.takipi.oss.storage.health.FilesystemHealthCheck;
 import com.takipi.oss.storage.resources.diag.MachineInfoOnlyStatusStorageResource;
@@ -77,9 +84,11 @@ public class TakipiStorageMain extends Application<TakipiStorageConfiguration> {
             return configureFolderFilesystem(configuration, environment);
         } else if(configuration.hasS3Fs()) {
             return configureS3Filesystem(configuration, environment);
+        } else if(configuration.hasGCSFs()) {
+            return configureGCSFilesystem(configuration, environment);
         }
         else {
-            throw new IllegalArgumentException("Configuration problem. Please configure either folderFs or s3Fs config property.");
+            throw new IllegalArgumentException("Configuration problem. Please configure either folderFs, s3Fs or gcsFF config property.");
         }
     }
 
@@ -122,6 +131,57 @@ public class TakipiStorageMain extends Application<TakipiStorageConfiguration> {
         log.debug("Using AWS S3 based filesystem with bucket: {}, prefix: {}", bucket, pathPrefix);
    
         return new S3Filesystem<T>(amazonS3, bucket, pathPrefix);
+    }
+
+    private <T extends BaseRecord> Filesystem<T> configureGCSFilesystem(TakipiStorageConfiguration configuration, Environment environment) {
+        StorageOptions storageOptions;
+        Storage storage;
+
+        // Setup basically mocked versions of info resources.
+        environment.jersey().register(new NoOpTreeStorageResource());
+        environment.jersey().register(new MachineInfoOnlyStatusStorageResource());
+
+        String jsonCredentialsFilename = configuration.getGCSFs().getJsonCredentialsFilename();
+
+        // if a credentials file is specified in the settings.yaml, we use if as first choice.
+        // credential file by providing a path to GoogleCredentials.
+        // Otherwise credentials are read from the GOOGLE_APPLICATION_CREDENTIALS environment variable.       
+        if ((jsonCredentialsFilename!= null) &&
+            (!jsonCredentialsFilename.isEmpty())) {
+                log.debug("Using GCS Filesystem with JSON Credentials filename: " + jsonCredentialsFilename);
+
+                GoogleCredentials credentials=null;
+                try {
+                    credentials = GoogleCredentials.fromStream(new FileInputStream(jsonCredentialsFilename))
+                            .createScoped(Lists.newArrayList("https://www.googleapis.com/auth/cloud-platform"));
+                } catch (IOException e) {
+                    // TODO Auto-generated catch block
+                    e.printStackTrace();
+                }
+                storageOptions = StorageOptions.newBuilder().setCredentials(credentials).build();
+        }
+        else {
+            // 1- Below the client library will first look for credentials via the environment
+            //    variable GOOGLE_APPLICATION_CREDENTIALS.
+            // 2- If the environment variable isn't set, and the service is running on:
+            //       - Compute Engine
+            //       - Kubernetes Engine
+            //       - App Engine
+            //       - Cloud Functions
+            //    then we use the default service account credentials for applications that run
+            //    on those services.
+            log.debug("Using GCS Filesystem with GOOGLE_APPLICATION_CREDENTIALS env or Default Service Account");
+            storageOptions = StorageOptions.getDefaultInstance();
+        }
+
+        storage = storageOptions.getService();
+        // S3 bucket
+        TakipiStorageConfiguration.GCSFs gcsFs = configuration.getGCSFs();
+        String bucket = gcsFs.getBucket();
+        String pathPrefix = gcsFs.getPathPrefix();
+        log.debug("Using GCS based filesystem with bucket: {}, prefix: {}", bucket, pathPrefix);
+   
+        return new GCSFilesystem<T>(storage, bucket, pathPrefix);
     }
 
     private void enableCors(TakipiStorageConfiguration configuration, Environment environment) {

@@ -1,14 +1,53 @@
 enableCors: true
 corsOrigins: "*"
 
-# If using attaching IAM Role to instance leave accessKey and secretKey empty
-# You can also leave accessKey and secretKey empty if you prefer to use credentials from ~/.aws/credentials
-s3Fs:
-    bucket: <bucket>
-    pathPrefix: <path_prefix>
-    credentials:
-      accessKey: <key> 
-      secretKey: <secret> 
+###################
+## Persistance Filesystems options in order of decreasing priority
+## - only one option with the highest priority will be considered (check logs)
+## - the priority is currently (from high to low):
+##   -- mounted filesystem (called folderFs) -- FOR THIS CURRENTLY USE THE MASTER BRANCH
+##   -- AWS S3 bucket (called s3Fs) - FOR THIS PLEASE USE THE S3 BRANCH#   -- AWS S3 bucket (called s3FS) - FOR THIS PLEASE USE THE S3 BRANCH
+##   -- Google Cloud Storage bucket (called gcsFs) - FOR THIS PLEASE USE THE S3 BRANCH
+##
+##
+##  - In the future branch will probably be merged to support a unique deployment
+## - please uncomment and configure ONE ONLY section below
+###################
+
+
+
+#folderFs:
+#  folderPath: /opt/takipi-storage/storage
+#  maxUsedStoragePercentage: 0.95
+
+
+## If using attaching IAM Role to instance leave accessKey and secretKey empty
+##  You can also leave accessKey and secretKey empty if you prefer to use
+## credentials from ~/.aws/credentials
+#s3Fs:
+#    bucket: <bucket>
+#    pathPrefix: <path_prefix>
+#    credentials:
+#      accessKey: <key>
+#      secretKey: <secret>
+
+## - Google Cloud Storage (GCS) credentials are passed below using 
+##  "jsonCredentialsFilename".
+##   -- In case of an instance running outside of Google Compute Engine
+##        if jsonCredentialsFilename is left empty, then we use the
+##        standard ENV var "GOOGLE_APPLICATION_CREDENTIALS" that should
+##        point to a JSON file with the credentials of a service account.
+##   -- In case of an instance running inside of Google Compute Engine:
+##        if jsonCredentialsFilename is left empty, a defualt service
+##        account from the project and/or form the instance can be used
+##        to leverage a IAM centralized configuration
+##
+## - required Roles for the service account on bucket: Storage Object Admin
+
+gcsFs:
+    bucket: testoverops
+    pathPrefix: overops
+    jsonCredentialsFilename: /Users/lorenzoconti/.gce/ooteststorage.json
 
 multifetch:
 
@@ -21,11 +60,6 @@ multifetch:
     enableCacheLogger: false
     
     maxBatchSize: 4194304
-
-#folderFs:
-#  folderPath: /opt/takipi-storage/storage
-#  maxUsedStoragePercentage: 0.95
-
 
 server:
   gzip:
@@ -48,13 +82,14 @@ server:
 # Logging settings.
 logging:
 
-  # The default level of all loggers. Can be OFF, ERROR, WARN, INFO, DEBUG, TRACE, or ALL.
+  # The default level of all loggers. Can be OFF, ERROR, WARN, INFO,
+  # DEBUG, TRACE, or ALL.
   level: INFO
 
-  # Logger-specific levels.
+  # Logger-specific levels. Change com.takipi to DEBUG to enable debug logging
   loggers:
 
-    com.takipi: DEBUG
+    com.takipi: INFO
 
   appenders:
     - type: console

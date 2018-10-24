@@ -119,6 +119,53 @@ public class TakipiStorageConfiguration extends Configuration {
         }
     }
     
+    @Valid
+    @JsonProperty
+    private GCSFs gcsFs;
+
+    public static class GCSFs {
+    
+        @NotEmpty
+        private String bucket;
+
+        private String pathPrefix;
+
+        @NotNull
+        @Valid
+        private String jsonCredentialsFilename;
+
+    
+        @JsonProperty
+        public String getBucket() {
+            return TakipiStorageConfigurationEnvResolver.resolveEnv(bucket);
+        }
+
+        @JsonProperty
+        public void setBucket(String bucket) {
+            this.bucket = bucket;
+        }
+        
+        @JsonProperty
+        public String getPathPrefix() {
+            return pathPrefix;
+        }
+
+        @JsonProperty
+        public void setPathPrefix(String pathPrefix) {
+            this.pathPrefix = pathPrefix;
+        }
+
+        @JsonProperty
+        public String getJsonCredentialsFilename() {
+            return jsonCredentialsFilename;
+        }
+
+        @JsonProperty
+        public void setJsonCredentialsFilename(String jsonCredentialsFilename) {
+            this.jsonCredentialsFilename = jsonCredentialsFilename;
+        }
+    }
+    
     @JsonProperty
     private Multifetch multifetch;
     
@@ -227,5 +274,19 @@ public class TakipiStorageConfiguration extends Configuration {
 
     public boolean hasS3Fs() {
         return s3Fs != null;
+    }
+
+    @JsonProperty
+    public GCSFs getGCSFs() {
+        return gcsFs;
+    }
+    
+    @JsonProperty
+    public void setGCSFs(GCSFs gcsFs) {
+        this.gcsFs = gcsFs;
+    }
+
+    public boolean hasGCSFs() {
+        return gcsFs != null;
     }
 }
